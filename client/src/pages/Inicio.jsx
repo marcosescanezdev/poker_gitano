@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Swords, Zap, ChevronRight, Users } from 'lucide-react';
 
+// URL del backend: usa la de Render o localhost si estás en tu PC
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 /* ── Cartas flotantes de fondo ───────────────────────────────────── */
 const CARTAS_DECO = [
   { val: '🂱', x: 8,  y: 12, rot: -18, delay: 0,    dur: 7  },
@@ -43,7 +46,7 @@ export default function Inicio() {
   const navigate = useNavigate();
   const [nombre,       setNombre]       = useState('');
   const [codigoSala,   setCodigoSala]   = useState('');
-  const [tab,          setTab]          = useState('crear');
+  const [tab,           setTab]          = useState('crear');
   const [modoJuego,    setModoJuego]    = useState('normal');
   const [vidas,        setVidas]        = useState(3);
   const [maxJugadores, setMaxJugadores] = useState(6);
@@ -52,7 +55,6 @@ export default function Inicio() {
   const [visible,      setVisible]      = useState(false);
 
   useEffect(() => {
-    // Animación de entrada con ligero delay
     const t = setTimeout(() => setVisible(true), 80);
     return () => clearTimeout(t);
   }, []);
@@ -60,8 +62,12 @@ export default function Inicio() {
   async function crearSala() {
     if (!nombre.trim()) return setError('Escribe tu nombre para continuar');
     setCargando(true); setError('');
+    
+    // Limpiamos la URL por si acaso tiene una barra al final
+    const base = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+
     try {
-      const res  = await fetch('/api/crear-sala', {
+      const res = await fetch(`${base}/api/crear-sala`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ modoJuego, vidasIniciales: vidas, maxJugadores }),
@@ -70,9 +76,14 @@ export default function Inicio() {
       if (data.salaId) {
         sessionStorage.setItem('lp_nombre', nombre.trim());
         navigate(`/sala/${data.salaId}`);
-      } else { setError(data.error || 'Error al crear la sala'); }
-    } catch { setError('No se puede conectar con el servidor'); }
-    finally  { setCargando(false); }
+      } else { 
+        setError(data.error || 'Error al crear la sala'); 
+      }
+    } catch (err) { 
+      console.error("Error de conexión:", err);
+      setError('No se puede conectar con el servidor'); 
+    }
+    finally { setCargando(false); }
   }
 
   function unirseSala() {
@@ -84,7 +95,6 @@ export default function Inicio() {
 
   return (
     <>
-      {/* ── Keyframe flotante inyectado inline ── */}
       <style>{`
         @keyframes flotar {
           from { transform: translateY(0px) rotate(var(--r, 0deg)); }
@@ -123,29 +133,16 @@ export default function Inicio() {
       `}</style>
 
       <div className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10">
-
-        {/* ── Fondo con gradientes radiales ── */}
         <div className="absolute inset-0 pointer-events-none">
           <div style={{
             position: 'absolute', inset: 0,
             background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(20,82,20,0.55) 0%, transparent 70%)',
           }} />
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'radial-gradient(ellipse 60% 40% at 20% 80%, rgba(217,119,6,0.08) 0%, transparent 60%)',
-          }} />
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'radial-gradient(ellipse 50% 35% at 80% 70%, rgba(6,78,59,0.2) 0%, transparent 60%)',
-          }} />
           {CARTAS_DECO.map((c, i) => <CartaFlotante key={i} carta={c} />)}
         </div>
 
         <div className="relative z-10 w-full max-w-lg">
-
-          {/* ══ LOGO / HERO ══════════════════════════════════════════ */}
           <div className="logo-wrap text-center mb-10">
-            {/* Emblema */}
             <div className="inline-flex items-center justify-center mb-5">
               <div style={{
                 width: 90, height: 90,
@@ -159,31 +156,15 @@ export default function Inicio() {
               </div>
             </div>
 
-            {/* Nombre */}
-            <h1
-              className="logo-text font-bold leading-none mb-2"
-              style={{ fontFamily: '"Cinzel", serif', fontSize: 'clamp(2.8rem, 8vw, 4.5rem)', letterSpacing: '0.04em' }}
-            >
+            <h1 className="logo-text font-bold leading-none mb-2" style={{ fontFamily: '"Cinzel", serif', fontSize: 'clamp(2.8rem, 8vw, 4.5rem)', letterSpacing: '0.04em' }}>
               Poker Gitano
             </h1>
-
-            {/* Tagline */}
             <p className="text-gray-400 text-sm tracking-widest uppercase font-light mt-3">
               El juego de cartas · Multijugador en tiempo real
             </p>
-
-            {/* Palos decorativos */}
-            <div className="flex justify-center gap-5 mt-4 text-2xl opacity-30">
-              <span>🪙</span><span>🏆</span><span>⚔️</span><span>🪵</span>
-            </div>
           </div>
 
-          {/* ══ CARD FORMULARIO ══════════════════════════════════════ */}
-          <div
-            className="card-form panel-dorado p-8"
-            style={{ boxShadow: '0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(251,191,36,0.05)' }}
-          >
-            {/* Nombre */}
+          <div className="card-form panel-dorado p-8" style={{ boxShadow: '0 0 60px rgba(0,0,0,0.5), 0 0 30px rgba(251,191,36,0.05)' }}>
             <div className="mb-6">
               <label className="block text-xs text-gray-500 uppercase tracking-widest mb-2 font-semibold">
                 Tu nombre en la partida
@@ -199,11 +180,7 @@ export default function Inicio() {
               />
             </div>
 
-            {/* Tabs */}
-            <div
-              className="flex mb-6 p-1 rounded-xl"
-              style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
+            <div className="flex mb-6 p-1 rounded-xl" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.06)' }}>
               {[['crear', '➕ Crear partida'], ['unirse', '🔗 Unirse con código']].map(([key, label]) => (
                 <button
                   key={key}
@@ -219,11 +196,8 @@ export default function Inicio() {
               ))}
             </div>
 
-            {/* ── TAB CREAR ── */}
             {tab === 'crear' && (
-              <div className="space-y-5 mb-6 animate-fade-in">
-
-                {/* Modo */}
+              <div className="space-y-5 mb-6">
                 <div>
                   <label className="block text-xs text-gray-500 uppercase tracking-widest mb-2.5 font-semibold">
                     Modo de juego
@@ -236,25 +210,21 @@ export default function Inicio() {
                       <button
                         key={m.key}
                         onClick={() => setModoJuego(m.key)}
-                        className="p-3.5 rounded-xl text-left transition-all duration-200 relative overflow-hidden"
+                        className="p-3.5 rounded-xl text-left transition-all duration-200"
                         style={modoJuego === m.key
                           ? { border: '1px solid rgba(251,191,36,0.5)', background: 'rgba(251,191,36,0.12)', color: 'white' }
                           : { border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', color: '#9ca3af' }
                         }
                       >
-                        {modoJuego === m.key && (
-                          <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(251,191,36,0.6), transparent)' }} />
-                        )}
                         <div className="flex items-center gap-1.5 font-bold text-sm mb-1">
                           {m.icon} {m.label}
                         </div>
-                        <div className="text-xs opacity-60 leading-snug">{m.desc}</div>
+                        <div className="text-xs opacity-60">{m.desc}</div>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Vidas */}
                 <div>
                   <label className="block text-xs text-gray-500 uppercase tracking-widest mb-2.5 font-semibold">
                     Vidas por jugador
@@ -264,30 +234,28 @@ export default function Inicio() {
                       <button
                         key={v}
                         onClick={() => setVidas(v)}
-                        className="flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-150 flex flex-col items-center gap-0.5"
+                        className="flex-1 py-3 rounded-xl font-bold transition-all"
                         style={vidas === v
                           ? { background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)', color: '#fca5a5' }
                           : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#6b7280' }
                         }
                       >
-                        <span className="text-lg leading-none">{'❤️'.repeat(v)}</span>
-                        <span style={{ fontSize: 10 }}>{v} vida{v > 1 ? 's' : ''}</span>
+                        <span className="text-lg">{'❤️'.repeat(v)}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Jugadores */}
                 <div>
-                  <label className="block text-xs text-gray-500 uppercase tracking-widest mb-2.5 font-semibold flex items-center gap-1.5">
-                    <Users size={11} /> Máx. jugadores
+                  <label className="block text-xs text-gray-500 uppercase tracking-widest mb-2.5 font-semibold">
+                    Máx. jugadores
                   </label>
                   <div className="flex gap-1.5">
                     {OPCIONES_JUGADORES.map(n => (
                       <button
                         key={n}
                         onClick={() => setMaxJugadores(n)}
-                        className="flex-1 h-10 rounded-xl font-bold text-sm transition-all duration-150"
+                        className="flex-1 h-10 rounded-xl font-bold text-sm"
                         style={maxJugadores === n
                           ? { background: 'rgba(251,191,36,0.2)', border: '1px solid rgba(251,191,36,0.5)', color: '#fde68a' }
                           : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#6b7280' }
@@ -301,14 +269,13 @@ export default function Inicio() {
               </div>
             )}
 
-            {/* ── TAB UNIRSE ── */}
             {tab === 'unirse' && (
-              <div className="mb-6 animate-fade-in">
+              <div className="mb-6">
                 <label className="block text-xs text-gray-500 uppercase tracking-widest mb-2.5 font-semibold">
                   Código de sala
                 </label>
                 <input
-                  className="input-casino text-center font-mono font-black tracking-[0.5em] uppercase"
+                  className="input-casino text-center font-mono font-black uppercase"
                   style={{ fontSize: '2rem', letterSpacing: '0.45em' }}
                   placeholder="• • • • • •"
                   value={codigoSala}
@@ -316,54 +283,22 @@ export default function Inicio() {
                   onKeyDown={e => e.key === 'Enter' && unirseSala()}
                   maxLength={6}
                 />
-                <p className="text-gray-600 text-xs mt-2 text-center">
-                  Pídele el código al anfitrión de la partida
-                </p>
               </div>
             )}
 
-            {/* Error */}
             {error && (
-              <div
-                className="px-4 py-2.5 rounded-xl mb-4 text-sm text-red-300 animate-fade-in"
-                style={{ background: 'rgba(127,29,29,0.4)', border: '1px solid rgba(239,68,68,0.3)' }}
-              >
+              <div className="px-4 py-2.5 rounded-xl mb-4 text-sm text-red-300" style={{ background: 'rgba(127,29,29,0.4)', border: '1px solid rgba(239,68,68,0.3)' }}>
                 ⚠️ {error}
               </div>
             )}
 
-            {/* Botón principal */}
             <button
               onClick={tab === 'crear' ? crearSala : unirseSala}
               disabled={cargando}
-              className="btn-primario w-full flex items-center justify-center gap-2 text-base"
-              style={{ fontSize: '1rem', padding: '0.875rem 1.5rem' }}
+              className="btn-primario w-full flex items-center justify-center gap-2 py-3.5"
             >
-              {cargando
-                ? <><span className="animate-spin">⏳</span> Creando sala…</>
-                : tab === 'crear'
-                ? <><span>Crear partida</span><ChevronRight size={18}/></>
-                : <><span>Unirse a la partida</span><ChevronRight size={18}/></>
-              }
+              {cargando ? 'Cargando...' : tab === 'crear' ? 'Crear partida' : 'Unirse a la partida'}
             </button>
-          </div>
-
-          {/* ── Pie de página ── */}
-          <div className="mt-8">
-            <div className="separador-linea mb-5" />
-            <div className="grid grid-cols-3 gap-4 text-center">
-              {[
-                { ico: '🙈', title: 'El Indio', desc: 'No ves tu carta en la ronda de 1' },
-                { ico: '⚔️', title: 'Modo Duelo', desc: '1 vs 1 con 1 carta si quedan 2' },
-                { ico: '⚠️', title: 'La Postre', desc: 'El último no puede igualar la suma' },
-              ].map(r => (
-                <div key={r.title} className="flex flex-col items-center gap-1.5">
-                  <span className="text-2xl">{r.ico}</span>
-                  <p className="text-dorado-400 font-semibold text-xs">{r.title}</p>
-                  <p className="text-gray-600 text-xs leading-snug">{r.desc}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

@@ -21,11 +21,17 @@ const {
 const app    = express();
 const server = http.createServer(app);
 
+// CONFIGURACIÓN DE CORS REFORZADA
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { 
+    origin: '*', 
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'] // Permitimos ambos para mayor compatibilidad
 });
 
 // ── Estado en memoria ─────────────────────────────────────────────────────────
@@ -49,9 +55,7 @@ function emitirLobby(salaId) {
   io.to(salaId).emit('lobby_actualizado', infoLobby(sala));
 }
 
-/** Programa el avance automático a la siguiente ronda */
 function programarSiguienteRonda(salaId, delay) {
-  // Cancelar cualquier timeout previo para esta sala
   if (timeoutsSala.has(salaId)) {
     clearTimeout(timeoutsSala.get(salaId));
   }
@@ -69,6 +73,9 @@ function programarSiguienteRonda(salaId, delay) {
 }
 
 // ── REST ──────────────────────────────────────────────────────────────────────
+// Ruta de salud para Render
+app.get('/', (req, res) => res.send('Servidor de Poker Gitano está ONLINE ✅'));
+
 app.post('/api/crear-sala', (req, res) => {
   const { nombre, modoJuego, vidasIniciales, maxJugadores } = req.body;
   const sala = crearSala({ nombre, modoJuego, vidasIniciales, maxJugadores });
@@ -85,7 +92,6 @@ app.get('/api/sala/:id', (req, res) => {
 io.on('connection', (socket) => {
   console.log(`[+] Conectado: ${socket.id}`);
 
-  // ── UNIRSE A SALA ──────────────────────────────────────────────────────────
   socket.on('unirse_sala', ({ salaId, jugadorId, nombre }) => {
     const id     = jugadorId || uuidv4();
     const result = unirseSala(salaId, { id, socketId: socket.id, nombre });
@@ -100,107 +106,64 @@ io.on('connection', (socket) => {
     socket.emit('unido_sala', { jugadorId: result.jugador.id, salaId });
     emitirLobby(salaId);
 
-    // Si ya hay una partida en curso, enviar estado al jugador recién conectado
     const estadoActual = estadosPartida.get(salaId?.toUpperCase());
     if (estadoActual) {
       const vista = construirVistaJugador(estadoActual, result.jugador.id);
       socket.emit('partida_iniciada');
       socket.emit('estado_actualizado', vista);
     }
-
-    console.log(`  → ${result.jugador.nombre} se unió a ${salaId}`);
   });
 
-  // ── INICIAR PARTIDA ────────────────────────────────────────────────────────
   socket.on('iniciar_partida', ({ salaId }) => {
     const sala = obtenerSala(salaId);
-    if (!sala)                              return socket.emit('error_sala', 'Sala no encontrada');
+    if (!sala) return socket.emit('error_sala', 'Sala no encontrada');
     if (sala.anfitrion !== socket.data.jugadorId) return socket.emit('error_sala', 'Solo el anfitrión puede iniciar');
-    if (sala.jugadores.length < 2)          return socket.emit('error_sala', 'Se necesitan al menos 2 jugadores');
-    if (sala.fase !== 'lobby')              return socket.emit('error_sala', 'La partida ya está en curso');
-
+    
     sala.fase = 'jugando';
-
     const config = {
       salaId,
-      modoJuego:      sala.modoJuego,
+      modoJuego: sala.modoJuego,
       vidasIniciales: sala.vidasIniciales,
-      jugadores:      sala.jugadores.map(j => ({ id: j.id, nombre: j.nombre })),
+      jugadores: sala.jugadores.map(j => ({ id: j.id, nombre: j.nombre })),
     };
 
     const estado = crearEstadoInicial(config);
     estadosPartida.set(salaId, estado);
-
     io.to(salaId).emit('partida_iniciada');
     emitirEstado(salaId);
-
-    console.log(`  → Partida iniciada en ${salaId} (${sala.jugadores.length} jugadores) — fase: sorteo`);
-
-    // Auto-avanzar del sorteo a la primera ronda tras 5 segundos
     programarSiguienteRonda(salaId, 5000);
   });
 
-  // ── APOSTAR ───────────────────────────────────────────────────────────────
   socket.on('hacer_apuesta', ({ salaId, apuesta }) => {
     let estado = estadosPartida.get(salaId);
-    if (!estado)               return socket.emit('error_juego', 'Partida no encontrada');
-    if (estado.fase !== 'subasta') return socket.emit('error_juego', 'No estamos en fase de subasta');
-
+    if (!estado) return;
     const resultado = hacerApuesta(estado, socket.data.jugadorId, apuesta);
     if (resultado.error) return socket.emit('error_juego', resultado.error);
-
     estadosPartida.set(salaId, resultado);
     emitirEstado(salaId);
   });
 
-  // ── JUGAR CARTA ───────────────────────────────────────────────────────────
   socket.on('jugar_carta', ({ salaId, cartaId }) => {
     let estado = estadosPartida.get(salaId);
-    if (!estado)               return socket.emit('error_juego', 'Partida no encontrada');
-    if (estado.fase !== 'jugando') return socket.emit('error_juego', 'No estamos en fase de juego');
-
+    if (!estado) return;
     const resultado = jugarCarta(estado, socket.data.jugadorId, cartaId);
     if (resultado.error) return socket.emit('error_juego', resultado.error);
-
     estadosPartida.set(salaId, resultado);
     emitirEstado(salaId);
-
-    // Si la ronda terminó, auto-avanzar a la siguiente tras 4 segundos
-    if (resultado.fase === 'resultado') {
-      programarSiguienteRonda(salaId, 4000);
-    }
-    // Si la partida terminó, no programar nada
+    if (resultado.fase === 'resultado') programarSiguienteRonda(salaId, 4000);
   });
 
-  // ── NUEVA PARTIDA (reset al lobby) ────────────────────────────────────────
-  socket.on('nueva_partida', ({ salaId }) => {
-    const sala = obtenerSala(salaId);
-    if (!sala) return;
-    if (sala.anfitrion !== socket.data.jugadorId) return socket.emit('error_juego', 'Solo el anfitrión puede reiniciar');
-
-    // Cancelar timeouts pendientes
-    if (timeoutsSala.has(salaId)) {
-      clearTimeout(timeoutsSala.get(salaId));
-      timeoutsSala.delete(salaId);
-    }
-
-    sala.fase = 'lobby';
-    estadosPartida.delete(salaId);
-    emitirLobby(salaId);
-  });
-
-  // ── DESCONEXIÓN ───────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
-    const { jugadorId, salaId, nombre } = socket.data;
-    if (!jugadorId || !salaId) return;
-    console.log(`[-] Desconectado: ${nombre} (sala ${salaId})`);
-    salirSala(salaId, jugadorId);
-    emitirLobby(salaId);
+    const { jugadorId, salaId } = socket.data;
+    if (jugadorId && salaId) {
+      salirSala(salaId, jugadorId);
+      emitirLobby(salaId);
+    }
   });
 });
 
-// ── Inicio ────────────────────────────────────────────────────────────────────
+// ESCUCHA DEL PUERTO PARA PRODUCCIÓN
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`🃏 Servidor Poker Gitano en http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🃏 Servidor listo en puerto ${PORT}`);
 });
