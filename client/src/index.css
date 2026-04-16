@@ -1,0 +1,183 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    @apply bg-tapete-900 text-white font-sans;
+    background-image:
+      radial-gradient(ellipse at top, rgba(20, 82, 20, 0.4) 0%, transparent 60%),
+      radial-gradient(ellipse at bottom, rgba(10, 31, 10, 0.8) 0%, transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    @apply bg-dorado-500 text-tapete-900;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-tapete-900; }
+  ::-webkit-scrollbar-thumb { @apply bg-dorado-600 rounded-full; }
+}
+
+@layer components {
+  /* TAPETE */
+  .tapete-mesa {
+    background-color: #0f3610;
+    background-image:
+      radial-gradient(circle at center, rgba(20, 82, 20, 0.6) 0%, transparent 70%),
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(255,255,255,0.01) 10px,
+        rgba(255,255,255,0.01) 11px
+      );
+    border: 2px solid rgba(251, 191, 36, 0.2);
+    box-shadow: inset 0 0 80px rgba(0,0,0,0.5), 0 0 40px rgba(0,0,0,0.8);
+  }
+
+  /* CARTAS */
+  .carta-wrapper {
+    perspective: 600px;
+    cursor: pointer;
+  }
+
+  .carta {
+    @apply relative rounded-xl shadow-2xl select-none;
+    background: linear-gradient(135deg, #fffdf5 0%, #f5ead8 100%);
+    border: 1.5px solid #d4b896;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    will-change: transform;
+  }
+
+  .carta:hover {
+    transform: translateY(-12px) scale(1.05);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 20px rgba(251,191,36,0.2);
+  }
+
+  .carta.seleccionada {
+    transform: translateY(-20px) scale(1.08);
+    box-shadow: 0 24px 48px rgba(0,0,0,0.6), 0 0 30px rgba(251,191,36,0.5);
+    border-color: #fbbf24;
+  }
+
+  .carta.jugada {
+    @apply animate-card-deal;
+  }
+
+  .carta-reverso {
+    background: repeating-linear-gradient(
+      45deg,
+      #1a4a3a,
+      #1a4a3a 4px,
+      #0d2b20 4px,
+      #0d2b20 8px
+    );
+    border: 1.5px solid rgba(251, 191, 36, 0.3);
+  }
+
+  .carta-indio {
+    background: linear-gradient(135deg, #2d1b00 0%, #4a2d00 100%);
+    border: 2px dashed rgba(251, 191, 36, 0.5);
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  /* BOTONES ESTILO CASINO */
+  .btn-primario {
+    @apply px-6 py-3 rounded-xl font-semibold text-tapete-900 transition-all duration-200;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+    box-shadow: 0 4px 15px rgba(251,191,36,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .btn-primario:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(251,191,36,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .btn-primario:active {
+    transform: translateY(0);
+  }
+  .btn-primario:disabled {
+    @apply opacity-40 cursor-not-allowed;
+    transform: none;
+  }
+
+  .btn-secundario {
+    @apply px-6 py-3 rounded-xl font-semibold text-dorado-300 border border-dorado-600/40 transition-all duration-200;
+    background: rgba(251,191,36,0.08);
+  }
+  .btn-secundario:hover:not(:disabled) {
+    @apply border-dorado-400/60;
+    background: rgba(251,191,36,0.15);
+    transform: translateY(-1px);
+  }
+  .btn-secundario:disabled {
+    @apply opacity-30 cursor-not-allowed;
+  }
+
+  /* PANEL / CARD UI */
+  .panel {
+    @apply rounded-2xl border;
+    background: rgba(13, 43, 13, 0.8);
+    border-color: rgba(251,191,36,0.15);
+    backdrop-filter: blur(10px);
+  }
+
+  .panel-dorado {
+    @apply rounded-2xl border;
+    background: rgba(13, 43, 13, 0.9);
+    border-color: rgba(251,191,36,0.3);
+    box-shadow: 0 0 30px rgba(251,191,36,0.05), inset 0 1px 0 rgba(251,191,36,0.1);
+  }
+
+  /* BADGE VIDA */
+  .vida {
+    @apply inline-flex items-center justify-center text-red-400;
+    filter: drop-shadow(0 0 4px rgba(248,113,113,0.5));
+  }
+  .vida.perdida {
+    @apply text-gray-700;
+    filter: none;
+  }
+
+  /* INPUT ESTILO */
+  .input-casino {
+    @apply w-full rounded-xl px-4 py-3 text-white outline-none transition-all duration-200;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(251,191,36,0.2);
+  }
+  .input-casino:focus {
+    border-color: rgba(251,191,36,0.6);
+    box-shadow: 0 0 0 2px rgba(251,191,36,0.1);
+  }
+  .input-casino::placeholder { @apply text-gray-500; }
+
+  /* TURNO INDICATOR */
+  .turno-activo {
+    box-shadow: 0 0 0 3px rgba(251,191,36,0.7), 0 0 15px rgba(251,191,36,0.3);
+  }
+
+  /* MODAL OVERLAY */
+  .modal-overlay {
+    @apply fixed inset-0 flex items-center justify-center z-50;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+  }
+
+  /* LOG */
+  .log-entrada {
+    @apply text-sm py-1 border-b border-tapete-700/30 animate-slide-in;
+    color: rgba(255,255,255,0.75);
+  }
+
+  /* BADGE MODO */
+  .badge-modo {
+    @apply text-xs font-bold px-2 py-0.5 rounded-full;
+  }
+  .badge-normal { @apply bg-blue-900/50 text-blue-300 border border-blue-700/40; }
+  .badge-diferencia { @apply bg-purple-900/50 text-purple-300 border border-purple-700/40; }
+  .badge-duelo { @apply bg-red-900/50 text-red-300 border border-red-700/40 animate-pulse; }
+}
